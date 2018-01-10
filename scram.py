@@ -12,6 +12,7 @@ import sys
 import time
 import struct
 import unicodedata
+import logging
 
 # Could be used to initialize a socket.
 def Initialize(host, port):
@@ -22,7 +23,7 @@ def Initialize(host, port):
     try:
         connection.connect((host, port))
     except socket.error:
-        print "Error connecting host: {} at port: {}".format(host, port)
+        logging.error("Error connecting host: %s at port: %d", host, port)
         sys.exit()
 
     return connection
@@ -31,21 +32,20 @@ def Disconnect(connection):
     try:
         connection.close()
     except:
-        'Connection cannot be closed'
+        logging.error('Connection cannot be closed')
         return False
-    print 'Connection closed'
+    logging.info('Connection closed')
     return True
 
 def Authenticate(connection, username, password):
-    print "Scram Authenticate called.."
-
+    logging.info("Scram Authenticate called..")
     try:
         version = connection.ssl_version
     except:
-        print "Cannot verify ssl version of the connection"
+        logging.error("Cannot verify ssl version of the connection")
         sys.exit()
     if version != 3:
-        "Use ssl_version=ssl.PROTOCOL_TLSv1, not compatible otherwise."
+        logging.error("Use ssl_version=ssl.PROTOCOL_TLSv1, not compatible otherwise.")
         sys.exit()
 
     # Initialize empty state.
@@ -72,10 +72,10 @@ def Authenticate(connection, username, password):
     state = parse(response, state)
 
     if verifyServerSignature(state):
-        print "Authentication succeeded"
+        logging.info("Authentication succeeded")
         return True
     else:
-        print "Authentication failed"
+        logging.error("Authentication failed")
         return False
 
 # Sends client first message through the socket.
@@ -89,7 +89,7 @@ def clientFirstMessage(connection, state):
     buffer_ += state["client_first_msg_bare"]
 
     # Send the first message over the connection.
-    connection.send(buffer_)
+    connection.send(bytes(buffer_, 'utf-8'))
 
     return state
 
@@ -104,7 +104,7 @@ def clientFirstMessageBare(state):
     # Get nonce using the nonce function.
     nonce_ = nonce()
     state["nonce"] = nonce_
-    buffer_ += nonce_
+    buffer_ += nonce_.decode('utf-8')
     state["client_first_msg_bare"] = buffer_
     # Return the updated state with nonce & client_first_msg_bare
     return state
@@ -127,7 +127,7 @@ def receiveMessage(connection, timeout=1.0):
         if not data:
             cont = False
             break
-        response += data
+        response += data.decode('utf-8')
 
     # Remove the timeout for the connection.
     connection.settimeout(None)
@@ -195,7 +195,7 @@ def verifyServerSignature(state):
     try:
         verifier = state["v"]
     except KeyError:
-        print "Invalid proof says the server"
+        logging.error("Invalid proof says the server")
         sys.exit()
     saltedPassword = state["salted_password"]
     authMsg = state["auth_msg"]
@@ -211,29 +211,29 @@ def verifyServerSignature(state):
     compare = base64.standard_b64encode(serverSignature)
 
     if compare == verifier:
-        # print "Compare: {}, Verifier: {}".format(compare, verifier)
         return True
     else:
-        print "Server Signature not verified"
+        logging.error("Server Signature not verified")
         sys.exit()
 
 def nonce():
     # Set the size of the bufer to 10.
     size = 10
     # Initialize byte array full of 0 bytes with the given size.
-    zeros = bytearray(size)
-    b = buffer(zeros, 0, size)
+    bin = bytearray(size)
 
     # Assign a random value for each byte in the buffer.
-    for i in xrange(size):
-        zeros[i] = random.randint(0, 255)
+    for i in range(size):
+        bin[i] = random.randint(0, 255)
 
     # Get SHA1 checksum of the buffer.
-    sha1 = hashlib.sha1(zeros)
-    str_ = sha1.digest()
+    sha1 = hashlib.sha1(bin)
+    digest = sha1.digest()
 
     # Encode the buffer in hexadecimal characters.
-    hex_ = binascii.hexlify(b''.join(str_))
+
+    data = bin.join(digest[i:i+1] for i in range(len(digest)))
+    hex_ = binascii.hexlify(data)
 
     # Return the first 20 characters.
     return hex_[:20]
