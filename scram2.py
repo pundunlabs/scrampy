@@ -221,7 +221,6 @@ def verifyServerSignature(state):
     compare = base64.standard_b64encode(serverSignature)
 
     if compare == verifier:
-        # print 'Compare: {}, Verifier: {}'.format(compare, verifier)
         return True
     else:
         print 'Server Signature not verified'

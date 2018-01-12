@@ -74,7 +74,7 @@ def authenticate(connection, username, password):
     state = clientFinalMessage(state)
 
     buffer_ = state['client_final_msg']
-    status = sendMessage(connection, bytes(buffer_, 'utf-8'))
+    status = sendMessage(connection, bytes(buffer_, 'ascii'))
     response = receiveMessage(connection).strip()
 
     state = parse(response, state)
@@ -87,6 +87,7 @@ def authenticate(connection, username, password):
         return False
 
 def sendMessage(connection, msg):
+    # print('Sending message to server: ', msg)
     return connection.send(msg)
 
 def clientFirstMessage(state):
@@ -115,6 +116,7 @@ def clientFirstMessageBare(state):
 def clientFinalMessage(state):
     iterationCount = int(state['i'])
     salt = base64.standard_b64decode(state['s'])
+    # password = bytes(state['password'], 'utf8')
     password = bytes(state['password'], 'utf8')
     saltedPassword = hi(password, salt, iterationCount)
 
@@ -130,10 +132,10 @@ def clientFinalMessage(state):
     state['salted_password'] = saltedPassword
     state['auth_msg'] = authMsg
 
-    clientProof_encoded = base64.standard_b64encode(clientProof_).decode('utf-8')
+    clientProof_encoded = base64.standard_b64encode(clientProof_)
     clientFinalMsg = clientFinalMessageWoProof_
     clientFinalMsg += ',p='
-    clientFinalMsg += clientProof_encoded
+    clientFinalMsg += clientProof_encoded.decode('utf-8')
 
     state['client_final_msg'] = clientFinalMsg
 
@@ -316,7 +318,9 @@ def receiveMessage(connection, timeout=2):
             pass
 
     #join all parts to make final string
-    return b''.join(total_data)
+    response = b''.join(total_data)
+    # print('Received message from server: ', response)
+    return response
 
 def verifyServerSignature(state):
     try:
@@ -336,10 +340,9 @@ def verifyServerSignature(state):
     mac2.update(authMsg.encode('ascii'))
     serverSignature = mac2.digest()
 
-    compare = base64.standard_b64encode(serverSignature)
+    compare = base64.standard_b64encode(serverSignature).decode('utf8')
 
     if compare == verifier:
-        # print 'Compare: {}, Verifier: {}'.format(compare, verifier)
         return True
     else:
         print('Server Signature not verified')
