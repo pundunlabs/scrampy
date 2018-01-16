@@ -8,5 +8,6 @@ Scram authentication in Python
 import scrampy
 
 # Pass a socket connection instance with TLSv1, username and password.
-scrampy.Authenticate(connection, username, password)
+connection = scrampy.initialize(host, port)
+scrampy.authenticate(connection, username, password)
 ```
