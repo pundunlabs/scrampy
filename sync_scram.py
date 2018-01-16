@@ -31,7 +31,25 @@ def disconnect(connection):
         logging.error('Writer cannot be closed, exception {}'.format(sys.exc_info()[0]))
         raise
 
-def authenticate(username, password, connection):
+def authenticate(username, password, connection, retries = 0):
+    logging.debug('Scram authentication initiated, number of potential retries: {}'.format(retries))
+    succeeded = False
+    timeout = 0
+
+    while retries >= 0 and (not succeeded):
+        succeeded = authenticate_(username, password, connection, timeout = timeout)
+        if succeeded:
+            break
+
+        retries -= 1
+        if not timeout:
+            timeout = 1
+        else:
+            timeout *= 2
+        logging.debug('Scram authentication failed. Retrying, number of retries left: {}, timeout: {} second(s)'.format(retries, timeout))
+    return succeeded
+
+def authenticate_(username, password, connection, timeout = 0):
     logging.debug('Scram authenticate called...')
     state = {}
 
@@ -47,7 +65,7 @@ def authenticate(username, password, connection):
     logging.debug('Sent client first message')
 
     logging.debug('Receiving server first message')
-    received_data = receiveMessage(connection)
+    received_data = receiveMessage(connection, timeout = timeout)
     logging.debug('type of {}'.format(type(received_data)))
     response = received_data.strip()
     logging.debug('Received server first message: {}'.format(response))
@@ -64,7 +82,7 @@ def authenticate(username, password, connection):
     logging.debug('Sent client final message')
 
     logging.debug('Receiving server final message')
-    response = receiveMessage(connection).strip()
+    response = receiveMessage(connection, timeout = timeout).strip()
     logging.debug('Received server final message: {}'.format(response))
 
     state = scram_lib.parse(response, state)

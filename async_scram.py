@@ -33,12 +33,27 @@ def _disconnect(writer):
         logging.error('Writer cannot be closed, exception: {}'.format(sys.exc_info()[0]))
         raise
 
-def authenticate(username, password, reader, writer, loop):
-    return loop.run_until_complete(
-            _authenticate(username, password, reader, writer))
+def authenticate(username, password, reader, writer, loop, retries = 0):
+    logging.debug('Scram authentication initiated, number of potential retries: {}'.format(retries))
+    succeeded = False
+    timeout = 0
+
+    while retries >= 0 and (not succeeded):
+        succeeded = loop.run_until_complete(
+            _authenticate(username, password, reader, writer, timeout = timeout))
+        if succeeded:
+            break
+
+        retries -= 1
+        if not timeout:
+            timeout = 1
+        else:
+            timeout *= 2
+        logging.debug('Scram authentication failed. Retrying, number of retries left: {}, timeout: {} second(s)'.format(retries, timeout))
+    return succeeded
 
 @asyncio.coroutine
-def _authenticate(username, password, reader, writer):
+def _authenticate(username, password, reader, writer, timeout = 0):
     logging.debug('Scram authenticate called...')
     state = {}
 
@@ -54,7 +69,7 @@ def _authenticate(username, password, reader, writer):
     logging.debug('Sent client first message')
 
     logging.debug('Receiving server first message')
-    received_data = yield from receiveMessage(reader)
+    received_data = yield from receiveMessage(reader, timeout = timeout)
     response = received_data.strip()
     logging.debug('Received server first message: {}'.format(response))
     state['server_first_msg'] = response
@@ -70,7 +85,7 @@ def _authenticate(username, password, reader, writer):
     logging.debug('Sent client final message')
 
     logging.debug('Receiving server final message')
-    received_data = yield from receiveMessage(reader)
+    received_data = yield from receiveMessage(reader, timeout = timeout)
     response = received_data.strip()
     logging.debug('Received server final message: {}'.format(response))
 
@@ -86,8 +101,8 @@ def _authenticate(username, password, reader, writer):
 @asyncio.coroutine
 def sendMessage(writer, msg):
     writer.write(msg)
-    result = yield from writer.drain()
-    return result
+    yield from writer.drain()
+    return True
 
 @asyncio.coroutine
 def receiveMessage(reader, timeout = 0):
@@ -109,7 +124,7 @@ def receiveMessage(reader, timeout = 0):
             # Docs say: "When a timeout occurs, it cancels the task
             # and raises asyncio.TimeoutError."
             # But it doesn't cancel! So we cancel here.
-            coro.cancel()
+            # coro.cancel()
             break
 
     response = b''.join(total_data)
