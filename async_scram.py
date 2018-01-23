@@ -110,17 +110,13 @@ def receiveMessage(reader, timeout = 0):
     to = None
     #recv something
     while True:
-        logging.debug('in while.. ')
         coro = asyncio.Task(reader.read(4096))
         try:
-
             data = yield from asyncio.wait_for(coro, timeout=to)
-            logging.debug('in while after yield from.. ')
             if data:
                 total_data.append(data)
                 to = timeout
         except asyncio.TimeoutError:
-            logging.debug('timeout after 0.. ')
             # Docs say: "When a timeout occurs, it cancels the task
             # and raises asyncio.TimeoutError."
             # But it doesn't cancel! So we cancel here.
