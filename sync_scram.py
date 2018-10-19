@@ -1,3 +1,4 @@
+# vim: set expandtab:
 import asyncio
 import binascii
 import logging
@@ -5,31 +6,11 @@ import scram_lib
 import socket
 import ssl
 import sys
+import time
 
 if sys.version_info > (3,):
     buffer = memoryview
 
-def connect(host, port):
-    sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
-    connection = ssl.wrap_socket(sock, ssl_version=ssl.PROTOCOL_TLSv1)
-
-    try:
-        connection.connect((host,port))
-    except:
-        logging.error('Unexpected error:', sys.exc_info()[0])
-        raise
-
-    logging.debug('Connection established')
-
-    return connection
-
-def disconnect(connection):
-    try:
-        connection.close()
-        return True
-    except:
-        logging.error('Writer cannot be closed, exception {}'.format(sys.exc_info()[0]))
-        raise
 
 def authenticate(username, password, connection, retries = 0):
     logging.debug('Scram authentication initiated, number of potential retries: {}'.format(retries))
@@ -61,13 +42,12 @@ def authenticate_(username, password, connection, timeout = 0):
     buffer_ = state['client_first_msg']
 
     logging.debug('Sending client first message')
-    status = sendMessage(connection, bytes(buffer_, 'utf-8'))
+    status = connection.write_data(bytes(buffer_, 'utf-8'))
     logging.debug('Sent client first message')
 
     logging.debug('Receiving server first message')
-    received_data = receiveMessage(connection, timeout = timeout)
-    logging.debug('type of {}'.format(type(received_data)))
-    response = received_data.strip()
+    response = connection.read_data(timeout = timeout)
+    logging.debug('type of {}'.format(type(response)))
     logging.debug('Received server first message: {}'.format(response))
     state['server_first_msg'] = response
 
@@ -78,11 +58,11 @@ def authenticate_(username, password, connection, timeout = 0):
 
     buffer_ = state['client_final_msg']
     logging.debug('Sending client final message')
-    status = sendMessage(connection, bytes(buffer_, 'ascii'))
+    status = connection.write_data(bytes(buffer_, 'ascii'))
     logging.debug('Sent client final message')
 
     logging.debug('Receiving server final message')
-    response = receiveMessage(connection, timeout = timeout).strip()
+    response = connection.read_data(timeout = timeout)
     logging.debug('Received server final message: {}'.format(response))
 
     state = scram_lib.parse(response, state)
@@ -105,7 +85,7 @@ def receiveMessage(connection, timeout = 0):
     while True:
         #recv something
         try:
-            data = connection.recv(4096)
+            data = connection.recv(4096, timeout)
             logging.debug('recv data: {}'.format(data))
             if data:
                 connection.settimeout(timeout)
@@ -176,12 +156,64 @@ def clientFinalMessage(state):
 
     return state
 
+class TestConnection:
+    def __init__(self, connection=None):
+        self.connection = connection
+
+    def recvall(self, count, timeout=0):
+        buf = b''
+        while count:
+            newbuf = self.connection.recv(count)
+            if not newbuf:
+                break
+            buf = b''.join([buf, newbuf])
+            count -= len(newbuf)
+
+        return buf
+
+    def read_data(self, timeout=0):
+        if timeout != 0 and timeout != None:
+            self.connection.settimeout(timeout)
+        numbytes = self.recvall(4)
+        length = int.from_bytes(numbytes, byteorder='big')
+        data = self.recvall(length)
+        return data
+
+    def write_data(self, msg, timeout=0):
+        length = len(msg)
+        num_bytes = length.to_bytes(4, byteorder='big')
+        data = b''.join([num_bytes, msg])
+        res = self.connection.sendall(data)
+        return res
+
+    def connect(self, host, port):
+        sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+        connection = ssl.wrap_socket(sock, ssl_version=ssl.PROTOCOL_TLSv1)
+
+        try:
+            connection.connect((host,port))
+        except:
+            logging.error('Unexpected error:', sys.exc_info()[0])
+            raise
+
+        logging.debug('Connection established')
+        self.connection = connection
+
+    def disconnect(self):
+        try:
+            self.connection.close()
+        except:
+            logging.error('Writer cannot be closed, exception {}'.format(sys.exc_info()[0]))
+            raise
+
+
 # For testing.
 if __name__ == "__main__":
     scram_lib.setup_logging()
-    host = '192.168.211.166'
+    host = 'localhost'
     port = 8887
     username = password = 'admin'
-    conn = connect(host, port)
-    authenticate(username, password, conn)
-    disconnect(conn)
+    connection = TestConnection()
+    connection.connect(host, port)
+    authenticate(username, password, connection)
+    connection.disconnect()
