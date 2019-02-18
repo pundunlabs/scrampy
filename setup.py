@@ -2,7 +2,7 @@
 
 from setuptools import setup, find_packages
 
-setup(name='Scrampy',
+setup(name='scrampy',
      version='0.0.1',
      description='Pundun Client',
      author='Cagdas',

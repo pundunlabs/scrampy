@@ -2,12 +2,13 @@
 import asyncio
 import binascii
 import logging
-import scram_lib
 import socket
 import ssl
 import sys
 import time
 import types
+
+from scrampy import scram_lib
 
 if sys.version_info > (3,):
     buffer = memoryview
@@ -108,12 +109,13 @@ if __name__ == "__main__":
 import asyncio
 import binascii
 import logging
-import scram_lib
 import socket
 import ssl
 import sys
 import time
 import types
+
+from scrampy import scram_lib
 
 if sys.version_info > (3,):
     buffer = memoryview

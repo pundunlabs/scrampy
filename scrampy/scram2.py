@@ -21,13 +21,13 @@ def initialize(host, port):
     try:
         connection.connect((host, port))
     except socket.error:
-        print 'socket.error connecting host: {} at port: {}'.format(host, port)
+        print('socket.error connecting host: {} at port: {}'.format(host, port))
         sys.exit()
     except:
-        print 'Unknown error connecting host: {} at port: {}'.format(host, port)
+        print('Unknown error connecting host: {} at port: {}'.format(host, port))
         sys.exit()
 
-    print 'Connection established'
+    print('Connection established')
 
     return connection
 
@@ -35,22 +35,22 @@ def disconnect(connection):
     try:
         connection.close()
     except:
-        print 'Connection cannot be closed'
+        print('Connection cannot be closed')
         return False
 
-    print 'Connection closed'
+    print('Connection closed')
     return True
 
 def authenticate(connection, username, password):
-    print 'Scram authenticate called..'
+    print('Scram authenticate called..')
 
     try:
         version = connection.ssl_version
     except:
-        print 'Cannot verify ssl version of the connection'
+        print('Cannot verify ssl version of the connection')
         sys.exit()
     if version != 3:
-        print 'Use ssl_version=ssl.PROTOCOL_TLSv1, not compatible otherwise.'
+        print('Use ssl_version=ssl.PROTOCOL_TLSv1, not compatible otherwise.')
         sys.exit()
 
     # Initialize empty state.
@@ -84,10 +84,10 @@ def authenticate(connection, username, password):
     state = parse(response, state)
 
     if verifyServerSignature(state):
-        print 'Authentication succeeded'
+        print('Authentication succeeded')
         return True
     else:
-        print 'Authentication failed'
+        print('Authentication failed')
         return False
 
 def sendMessage(connection, msg):
@@ -205,7 +205,7 @@ def verifyServerSignature(state):
     try:
         verifier = state['v']
     except KeyError:
-        print 'Invalid proof says the server'
+        print('Invalid proof says the server')
         sys.exit()
     saltedPassword = state['salted_password']
     authMsg = state['auth_msg']
@@ -223,7 +223,7 @@ def verifyServerSignature(state):
     if compare == verifier:
         return True
     else:
-        print 'Server Signature not verified'
+        print('Server Signature not verified')
         sys.exit()
 
 def nonce():

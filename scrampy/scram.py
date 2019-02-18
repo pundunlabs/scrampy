@@ -1,9 +1,10 @@
 import asyncio
-import async_scram
 import logging
-import scram_lib
-import sync_scram
 import unittest
+
+from scrampy import async_scram
+from scrampy import scram_lib
+from scrampy import sync_scram
 
 def connect(host, port, loop=None):
     if loop:
